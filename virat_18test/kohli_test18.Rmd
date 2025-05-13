@@ -1,0 +1,399 @@
+---
+title: "Virat Kohli Test Career Analysis"
+author: "Deepak Kumar"
+date: "2025-05-13"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Load neccessary libraries
+```{r}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+```
+
+#level-1 data cleaning and preprocessing 
+
+#load the dataset
+```{r}
+data<-read_excel("C:/virat kohli analysis/testcareermatchwise.xlsx")
+View(data)
+```
+
+
+# Rename columns for readability
+```{r}
+colnames(data) <- c("Bat1", "Bat2", "Runs", "BallsFaced", "StrikeRate", "Fours", "Sixes", 
+                    "Unused", "Opposition", "Ground", "StartDate", "TestNumber")
+
+```
+
+
+
+
+# Drop unused column
+```{r}
+data <- data %>% select(-Unused)
+
+```
+
+
+
+
+# Remove "v " prefix from Opposition
+```{r}
+data$Opposition <- gsub("^v\\s+", "", data$Opposition)
+
+```
+
+
+
+# Convert StartDate to Date format
+```{r}
+library(lubridate)
+
+data$StartDate <- dmy(data$StartDate)
+
+
+```
+
+
+
+
+# Handle missing values and extract not out flag
+```{r}
+clean_innings <- function(score) {
+  score <- as.character(score)
+  score[score %in% c("DNB", "TDNB", "absent")] <- NA
+  score <- gsub("\\*", "", score)  # Remove not-out asterisk
+  return(as.numeric(score))
+}
+not_out_flag <- function(score) {
+  score <- as.character(score)
+  return(grepl("\\*", score))
+}
+
+```
+
+
+
+
+# Apply cleaning to Bat1 and Bat2
+```{r}
+data <- data %>%
+  mutate(
+    Bat1_NotOut = not_out_flag(Bat1),
+    Bat2_NotOut = not_out_flag(Bat2),
+    Bat1 = clean_innings(Bat1),
+    Bat2 = clean_innings(Bat2)
+  )
+
+# Combine total runs in both innings
+data <- data %>%
+  mutate(
+    TotalRuns = rowSums(cbind(Bat1, Bat2), na.rm = TRUE),
+    TotalNotOuts = Bat1_NotOut + Bat2_NotOut,
+    PlayedInnings = (!is.na(Bat1)) + (!is.na(Bat2)),
+    Year = year(StartDate)
+  )
+
+```
+
+
+
+
+# Clean other numeric columns
+```{r}
+data <- data %>%
+  mutate(
+    Runs = as.numeric(Runs),
+    BallsFaced = as.numeric(BallsFaced),
+    StrikeRate = as.numeric(StrikeRate),
+    Fours = as.numeric(Fours),
+    Sixes = as.numeric(Sixes)
+  )
+
+
+```
+
+
+
+ Add placeholder for match duration 
+```{r}
+data$MatchDuration <- 5  # By default, Test match = 5 days
+
+```
+
+
+
+
+
+# Preview the cleaned data
+```{r}
+str(data)
+head(data)
+
+```
+*after performing all cleanig check the data type of columns and retrieve first 8 data using head  function*
+
+
+###Level -2 stastical analysis of my dataset
+# 1. Overall career batting average (runs per innings)
+```{r}
+career_average <- sum(data$TotalRuns, na.rm = TRUE) / sum(data$PlayedInnings, na.rm = TRUE)
+
+```
+*this average may differ from real average because in real average for cricket matches consider not out inning then calculate*
+
+
+
+
+# 2. Career not-out percentage
+```{r}
+not_out_percentage <- mean(data$TotalNotOuts > 0) * 100
+
+```
+
+# 3. Highest score in a single innings
+```{r}
+highest_score <- max(c(data$Bat1, data$Bat2), na.rm = TRUE)
+
+```
+*this score was made by kohli against south africa* 
+
+
+
+# 4. Total career runs
+```{r}
+total_runs <- sum(data$TotalRuns, na.rm = TRUE)
+
+```
+*in test matches virat has scored total 9230 runs*
+
+
+
+# 5. Total centuries (100+ in any single innings)
+```{r}
+centuries <- sum(data$Bat1 >= 100, na.rm = TRUE) + sum(data$Bat2 >= 100, na.rm = TRUE)
+
+```
+*virat has scroed total 30 test centuries*
+
+
+
+# 6. Total fifties (50–99 in any innings)
+```{r}
+fifties <- sum(data$Bat1 >= 50 & data$Bat1 < 100, na.rm = TRUE) +
+           sum(data$Bat2 >= 50 & data$Bat2 < 100, na.rm = TRUE)
+
+```
+*virat has scored 31 total fifites*
+
+
+
+
+# 7. Average runs per year
+```{r}
+avg_runs_year <- data %>%
+  group_by(Year) %>%
+  summarise(RunsInYear = sum(TotalRuns, na.rm = TRUE)) %>%
+  mutate(AveragePerYear = round(RunsInYear / n(), 2))
+
+```
+
+
+
+
+
+# 8. Average against each opposition
+```{r}
+avg_opposition <- data %>%
+  group_by(Opposition) %>%
+  summarise(Average = round(sum(TotalRuns, na.rm = TRUE) / sum(PlayedInnings, na.rm = TRUE), 2),
+            Matches = n())
+
+```
+
+*this table shows batting average of virat kohli against each teams*
+
+
+# 9. Ground-wise batting average
+```{r}
+avg_ground <- data %>%
+  group_by(Ground) %>%
+  summarise(Average = round(sum(TotalRuns, na.rm = TRUE) / sum(PlayedInnings, na.rm = TRUE), 2),
+            Matches = n())
+
+```
+*this table shows average of different grounds*
+
+
+
+
+# 10. Strike Rate analysis: mean and max
+```{r}
+mean_strike_rate <- mean(data$StrikeRate, na.rm = TRUE)
+max_strike_rate <- max(data$StrikeRate, na.rm = TRUE)
+print(mean_strike_rate)
+print(max_strike_rate)
+```
+*virat mean strike rate is 51.20223*
+*virat max strike rate in test is 105.55*
+
+
+###Level-3 visualization of my dataset
+#loading required libraries visualization
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+```
+
+
+
+#virat kohli runs against opponents 
+```{r}
+ggplot(data %>% group_by(Opposition) %>% summarise(TotalRuns = sum(TotalRuns, na.rm = TRUE)),
+       aes(x = reorder(Opposition, -TotalRuns), y = TotalRuns)) +
+  geom_col(fill = "tomato") +
+  coord_flip() +
+  labs(title = "Total Runs vs Each Opposition", x = "Opposition", y = "Runs")
+
+```
+
+
+
+#vira kohli batting average per oppositon 
+```{r}
+data %>%
+  group_by(Opposition) %>%
+  summarise(Average = sum(TotalRuns, na.rm = TRUE) / sum(PlayedInnings, na.rm = TRUE)) %>%
+  ggplot(aes(x = reorder(Opposition, -Average), y = Average)) +
+  geom_col(fill = "purple") +
+  coord_flip() +
+  labs(title = "Batting Average vs Opposition", x = "Opposition", y = "Average")
+
+```
+
+
+# virat kohli performence over time innings-by-innings 
+```{r}
+data %>%
+  mutate(MatchNumber = row_number()) %>%
+  ggplot(aes(x = MatchNumber, y = TotalRuns)) +
+  geom_line(color = "blue") +
+  geom_smooth(se = FALSE, color = "red") +
+  labs(title = "Match-by-Match Total Runs", x = "Match Number", y = "Runs")
+
+```
+
+
+
+# virat kohli runs distributions  using histogram
+```{r}
+ggplot(data, aes(x = TotalRuns)) +
+  geom_histogram(binwidth = 10, fill = "orange", color = "black") +
+  labs(title = "Runs Distribution per Match", x = "Runs", y = "Frequency")
+
+```
+
+
+# virat kohli strike rate over time 
+```{r}
+data %>%
+  mutate(MatchNumber = row_number()) %>%
+  ggplot(aes(x = MatchNumber, y = StrikeRate)) +
+  geom_line(color = "darkred") +
+  geom_point() +
+  labs(title = "Strike Rate Match-by-Match", x = "Match Number", y = "Strike Rate")
+
+```
+
+
+#virat kohli runs by ground  
+```{r}
+data %>%
+  group_by(Ground) %>%
+  summarise(Runs = sum(TotalRuns, na.rm = TRUE)) %>%
+  arrange(desc(Runs)) %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(Ground, -Runs), y = Runs)) +
+  geom_col(fill = "navy") +
+  coord_flip() +
+  labs(title = "Top 10 Grounds with Most Runs", x = "Ground", y = "Runs")
+
+```
+
+
+
+# virat kohli total fours and sixes
+```{r}
+data %>%
+  summarise(TotalFours = sum(Fours, na.rm = TRUE),
+            TotalSixes = sum(Sixes, na.rm = TRUE)) %>%
+  pivot_longer(cols = everything(), names_to = "Type", values_to = "Count") %>%
+  ggplot(aes(x = Type, y = Count, fill = Type)) +
+  geom_col() +
+  labs(title = "Total Fours vs Sixes", x = "Type", y = "Count")
+
+```
+
+
+#virat kohli  bat1 vs bat2 comparison  using  bar plot 
+```{r}
+
+data <- data %>%
+  mutate(Match = row_number())
+
+data_long <- data %>%
+  select(Match, Bat1, Bat2) %>%
+  pivot_longer(cols = c(Bat1, Bat2), names_to = "Innings", values_to = "Runs")
+
+data_long$Runs <- as.numeric(data_long$Runs)
+
+ggplot(data_long, aes(x = Match, y = Runs, color = Innings)) +
+  geom_line(size = 1) +
+  labs(title = "Innings-wise Batting Comparison", x = "Match Number", y = "Runs Scored") +
+  theme_minimal()
+
+
+```
+
+
+# 100s and 50s highlight chart
+```{r}
+ggplot(data, aes(x = Match, y = TotalRuns, fill = TotalRuns)) +
+  geom_col() +
+  scale_fill_gradient2(low = "skyblue", high = "darkred", midpoint = 100) +
+  geom_hline(yintercept = 50, linetype = "dashed", color = "orange") +
+  geom_hline(yintercept = 100, linetype = "dashed", color = "green") +
+  labs(title = "Test Scores with 50 & 100 Milestones", x = "Match", y = "Total Runs") +
+  theme_minimal()
+
+```
+
+
+##Runs Over Time
+```{r}
+
+
+data <- data %>%
+  mutate(CumulativeRuns = cumsum(TotalRuns))
+
+ggplot(data, aes(x = Match, y = CumulativeRuns)) +
+  geom_line(color = "darkgreen", size = 1) +
+  labs(title = "Cumulative Runs Over Test Career", x = "Match Number", y = "Cumulative Runs") +
+  theme_minimal()
+
+```
+*this graph shows total runs have accumulayed across his career*
